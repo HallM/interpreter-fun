@@ -1,0 +1,12 @@
+{
+  "name": "interpreter-fun",
+  "version": "0.0.1",
+  "description": "just because",
+  "main": "index.js",
+  "dependencies": {
+    "babylon": "^6.17.4"
+  },
+  "devDependencies": {},
+  "author": "Matt Hall <mdhall@gmail.com>",
+  "license": "MIT"
+}
