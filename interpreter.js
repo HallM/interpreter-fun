@@ -8,6 +8,13 @@ const Func = require('./function');
 const folderpath = path.resolve('node_modules/express/lib');
 const filepath = path.join(folderpath, 'application.js');
 
+// we have to make multiple passes anyway, due to the way hoisting works
+// first pass, at a bare minimum, collects what identifiers exist and any definitions
+// functions declared in a block that isnt the main fn-block are declared, but not defined
+// this is the same as doing var fn = function() ...
+// this phase would also collect all the functions to be scanned and maybe build a graph?
+// that way
+
 // TODO:
 // tracking current "condition" stack
 // proper way to track stack (no globals)
@@ -17,7 +24,57 @@ const filepath = path.join(folderpath, 'application.js');
 // and pause it to process external resources
 // should there be an external format to manage all the data? probably need to
 
-let showMore = true;
+// could pass the "current set of conditions" as a parameter
+// hell, could do the same with the Stack
+// that does work good for this style of parser, but does it work well for a streaming parser?
+
+// another thought is to work in reverse:
+// a node only defines it's required-conditions and effects (incl value)
+// some nodes will "validate" conditions to remove those from continuing upward
+// some nodes will add more conditions to the stack
+// but how could this properly do "if (x) { return; } doStuff(x)" and know that x is falsy for doStuff?
+// without translating into SESE form, a Current Condition/State has to be passed down
+
+// the return of each node I suppose could be:
+// any preconditions that node requires to run
+// the "value" of the execution (which attached is all the potential values based on conditions)
+// values can be a literal, a pointer (variable), could even have pointers to pointers to pointers
+// any postconditions the node imparts on the state of things
+// {
+//   value: Value | null,
+//   preconditions: [ PreCondition ],
+//   postconditions: [ PostCondition ],
+//   isAsync: true | false, // future thinking to handle async and race condition checking
+//   joinedBy: ?? | null, // if async, what causes it to "join" back to the main chain? needs more thought
+// }
+//
+// Value will contain the possible values and the conditions requires to reach each value
+// also contains Type information
+//
+// PreCondition do not define how the return is influences, only what it REQUIRES to run
+// example is "x(y)" REQUIRES that x is a function, it WILL NOT run any other way
+// a PreCondition could have a set of conditions that it takes affect though!
+// example "if (z) { x(y); }" only REQUIRES x is a function IF z is truthy
+//
+// PostCondition is the Effects of the running that particular code
+// - Any Conditions that will be known after
+// - Variable is modified (especially globals!)
+// - Throws error
+// - What about returns? breaks? continues?
+// each PostCondition can also be bound by a set of Conditions in which it takes effect
+// could also involve async behavior tracking. Async needs a lot more thought.
+// Value could be seen as a type of PostCondition, but is separate
+
+// TODO: future concept, a strictness configuration
+// lower levels of strictness allow x > 7 and not care if x is a number at all
+// higher levels of strictness start to require that x is a number
+
+// TODO: processing of comments to allow users to set Assumptions or ignore errors
+
+// TODO: processing of external Assumption files
+
+// TODO: could we process Typescript Def or Flow Def files to add assumptions?
+
 const rootStack = new Stack();
 let currentStack = rootStack;
 
@@ -170,6 +227,8 @@ const handlers = {
   'FunctionDeclaration': function handleFunctionDeclaration(node) {
     const id = handleAny(node.id);
     const params = node.params.map(handleAny);
+
+    // TODO: mark function, so that returns know how far up the chain to go
     const body = handleAny(node.body);
 
     // TODO: need to get the conditions of the function body
@@ -202,6 +261,13 @@ const handlers = {
     const previousStack = currentStack;
     currentStack = new Stack(previousStack);
 
+    // TODO: handling "hoisting" rules
+    // the fact the identifier exists is always hoisted
+    // variable initializers are never hoisted
+    // functions directly in the function exist at all time
+    //   therefore, functions are all known to each other, in any order
+    // functions declared within another block only have the identifier hoisted and NOT the definition
+    // the definition does not exist UNTIL the block is ran
     const ret = node.body.map(handleAny);
 
     // TODO: validate conditions that cannot bubble
@@ -219,7 +285,14 @@ const handlers = {
 
   'ReturnStatement': function handleReturnStatement(node) {
     const argument = node.argument ? handleAny(node.argument) : null;
+
     // TODO: add post-condition for return
+    // find the containing function
+    // determine the conditions from the entry to now
+    // add a potential return to the function
+    // for the remainder of the function,
+    //   the condition-stack from function start to this point is false
+
     return '';
   },
 
@@ -610,14 +683,38 @@ const handlers = {
   'LogicalExpression': function handleLogicalExpression(node) {
     const op = node.operator;
     const lhs = handleAny(node.left);
+
+    // result is technically "any"
+    // not sure if
+
+    if (operator === '&&') {
+      // the condition the RHS executes under is that the lhs is truthy
+      // if the lhs is falsy, rhs is never executed and is an unknown
+    } else if (operator === '||') {
+      // the condition the RHS executes under is that the lhs is falsy
+      // if the lhs is truthy, rhs is never executed and is an unknown
+    } else {
+      throw new Error('unknown logical-expression operator: ' + operator);
+    }
+
     const rhs = handleAny(node.right);
 
-    // result is a boolean
-    // lhs and rhs should resolve to a boolean but doesnt have to
-    // if a side doesnt resolve to a boolean, just follows truthy/falsy rules
-    // && adds a sub-entry into the Condition stack
-    // || adds a sibling-entry into the Condition stack
-    // TODO: is it possible to rewrite as single condition?
+    // for &&:
+    // resolves to RHS if LHS is truthy (no matter if RHS is truthy or falsy)
+    // resolves to LHS if LHS is falsy (no joke, that really is what it does)
+
+    // for ||:
+    // resolves to LHS if LHS is truthy (completely ignores RHS)
+    // resolves to RHS if LHS is falsy (no matter if RHS evalutes truthy or falsy)
+
+    // the type of the expression depends on the type of the site it resolves to
+    // '' && ANY resolves to ''
+    // 0 && ANY resolves to 0
+    // false && ANY resolves to false
+    // null && ANY resolves to null
+    // undefined && ANY resolves to undefined
+    // TRUTHY && ANY resolves to the ANY
+    // similar for ||, but with the OR rules instead of AND
 
     return null;
   },
@@ -692,6 +789,7 @@ const handlers = {
   */
 }
 
+// let showMore = true;
 function handleAny(node) {
   const type = node.type;
 
@@ -704,6 +802,7 @@ function handleAny(node) {
   console.log('unhandled:', node.type);
   // if (showMore) {
   //   showMore = false;
+  //   console.log(node);
   //   console.log(JSON.stringify(node, null, 2));
   // }
 
