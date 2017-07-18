@@ -207,21 +207,35 @@ function negateExpression(node) {
   }
 }
 
+function handleVariableDeclarator(node) {
+  const id = handleAny(node.id);
+  const value = node.init ? handleAny(node.init) : null;
+
+  // TODO: figure out the possible datatype(s)
+
+  return currentStack.addItem(id, new Variable(id, value));
+}
+
+function handleSwitchCase(node) {
+  const test = node.test ? handleAny(node.test) : null;
+  const consequent = node.consequent.map(handleAny);
+
+  // consequent may be empty array
+  // it may not break (thus fallthrough)
+  // even if there is a break, it may not ALWAYS break
+  // therefore, a consequent runs if test is TRUE
+  // but also is there is a fallthrough
+  // test is null for default and only one can exist
+
+  return 'case ' + (test || 'default');
+}
+
 const handlers = {
   'VariableDeclaration': function handleVariableDeclaration(node) {
     const kind = node.kind;
     // TODO: apply the kind to any variables (like const)
 
-    return node.declarations.map(handleAny);
-  },
-
-  'VariableDeclarator': function handleVariableDeclarator(node) {
-    const id = handleAny(node.id);
-    const value = node.init ? handleAny(node.init) : null;
-
-    // TODO: figure out the possible datatype(s)
-
-    return currentStack.addItem(id, new Variable(id, value));
+    return node.declarations.map(handleVariableDeclarator);
   },
 
   'FunctionDeclaration': function handleFunctionDeclaration(node) {
@@ -361,26 +375,12 @@ const handlers = {
 
   'SwitchStatement': function handleSwitchStatement(node) {
     const discriminant = handleAny(node.discriminant);
-    const cases = node.cases.map(handleAny);
+    const cases = node.cases.map(handleSwitchCase);
 
     // using the discriminant, attempt to determine if the cases are exhaustive
     // need to be able to apply fallthrough here
 
     return 'swwwitch';
-  },
-
-  'SwitchCase': function handleSwitchCase(node) {
-    const test = node.test ? handleAny(node.test) : null;
-    const consequent = node.consequent.map(handleAny);
-
-    // consequent may be empty array
-    // it may not break (thus fallthrough)
-    // even if there is a break, it may not ALWAYS break
-    // therefore, a consequent runs if test is TRUE
-    // but also is there is a fallthrough
-    // test is null for default and only one can exist
-
-    return 'case ' + (test || 'default');
   },
 
   'BreakStatement': function handleBreakStatement(node) {

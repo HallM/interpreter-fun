@@ -5,14 +5,9 @@ const path = require('path');
 const handleAny = require('./interpreter');
 
 function readSource(file) {
-  return `var x = 5;
-  var y = 3;
-  if (x && !(x - 1 === y && !(x + 2 < y)) || x + 5 < y) {
-    x = 7;
-  } else {
-    y = 4;
-  }
-  `;
+  return `function fn(x) {
+    return x + 1;
+  }`;
   // return fs.readFileSync(file, 'utf-8');
 }
 
