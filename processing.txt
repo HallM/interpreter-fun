@@ -1,0 +1,60 @@
+recusion:
+
+think of the "interpreter", it's mutual recursion
+A -> B -> C -> A -> D -> A -> ...
+
+it would be possible to collect all the *possible* return values (without conditions)
+that is simply the combined set from all the items in the loop
+conditions are a problem, because conditions themselves can be recursive
+
+something like fibb:
+function x(y) {
+  if (y <= 1) {
+    return 1;
+  }
+
+  return x(y - 1) + x(y - 2);
+}
+
+it is difficult to define the potential condition returns for a caller
+it seems simple, sure. that no matter what, passing in y <= 1 will get 1
+but then the conditions start compounding. how far do you take it?
+y > 1 && (y-1) > 1 && ... && (y-n) <= 1
+
+though.... there is an interesting concept of represending an infinitely "repeating" set of conditions
+in reality, it's not that they are truly infinite, but the possibility is infinite
+it could also be that only some starting steps and some ending steps are really necessary
+
+the simplest of course is to list only the possible return values
+maybe even a way to find commonality among the return values
+
+also, if all paths return the same type, then it doesnt really matter
+
+i just feel like with recursion, the best you can say is:
+when entering here, these are some conditions
+once it gets into the loop, best you can do is say what the possible return values are
+
+saying it twice, but commonality could be really big for types
+could be like a computed thing. "what is common among these types: [...]"
+that way a function could have "if x, returns Number, else returns TypeA | TypeB | TypeC | TypeD"
+then if you know x is falsy, then maybe you could ask "what is common among TypeA-D"
+
+though, I guess you know the set of possibles
+when hitting a statement, you could simply check if all possibles match the statement...
+so is commonality really necessary? yeah, kinda not...
+
+
+im not sure it can do link-later style either
+because, if you try to scan A and B, A calls B
+how does A know its final type without knowing what B is? what if A returns B?
+
+sure, could do something like "unknown" and keep rolling
+later conditions like "requiring string" would be tracked
+then in a "linker-like" step, it would resolve if those conditions were met or not
+
+on one hand, it's the only legit way to handle recursion
+each statement itself has preconditions and postconditions
+some statements will have to be a "determined later"
+blocks MAY be determinable now, or they may have to be determined later
+any complex statement which contains a "determine later" must be "determined later"
+then afterwards, the state is validated against the pre/post conditions
