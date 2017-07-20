@@ -7,25 +7,73 @@ exports.validate = function validateArrayExpression(state, node) {
 
   const stateAfterElements = node.elements.reduce(parseArrayElement, state);
 
-  const internalPreConditions = elements.map(e => e._preConditions).reduce(flatten);
-  const internalPostConditions = elements.map(e => e._postConditions).reduce(flatten);
+  let allPreConditions = [];
+  let allPostConditions = [];
+  const elementTypes = [];
 
-  // we don't really track further conditions beyond what elements are *possibly* in the array at this time
-  // would be cool, but dynamic insertions would make it impossible to know which is what type
-  const elementTypes = internalPostConditions.filter(isTypePostCondition).reduce(dedupTypes);
+  let exactValue = [];
 
-  // all post conditions which affect state are carried up
-  const affectors = internalPostConditions.filter(isAffectorPostCondition).reduce(dedupValues);
+  node.elements.forEach(function(element) {
+    const element = elements[i];
+    const {
+      preConditions,
+      value,
+      nextState,
+      postConditions
+    } = validateArrayElement(state, element);
 
-  node._preConditions = internalPreConditions;
+    if (exactValue != null) {
+      if (value.hasExactValue) {
+        exactValue.push(value.exactValue);
+      }
+    }
 
-  node._postConditions = [
-    new KnownPossibleTypes(
-      [ new ArrayType(elementTypes, ArrayType.IS_EXACT, elements.length) ]
-    )
-  ].concat(affectors);
+    // bubble pre conditions up
+    allPreConditions = allPreConditions.concat(preConditions);
 
-  return node;
+    // record all possible types into the array
+    // but do not bother with any conditions
+    const valueTypes = value.getAllTypes();
+    valueTypes.forEach(function(type) {
+      if (elementTypes.indexOf(type) === -1) {
+        elementTypes.push(type);
+      }
+    });
+
+    // the rest of the post conditions just bubble up
+    allPostConditions = allPostConditions.concat(postConditions);
+
+    state = nextState;
+  });
+
+  const valueSettings = exactValue != null ? {
+    type: new ArrayType(
+      elementTypes,
+      ArrayValue.IS_EXACT_LENGTH,
+      node.elements.length
+    ),
+    exactValue: exactValue
+  } : {
+    possibles: [
+      new Conditionally(
+        null, // applies to every condition
+        new ArrayType(
+          elementTypes,
+          ArrayValue.IS_EXACT_LENGTH,
+          node.elements.length
+        )
+      )
+    ]
+  };
+
+  const arrayValue = new Value(valueSettings);
+
+  return {
+    preConditions: allPreConditions,
+    postConditions: allPostConditions,
+    value: arrayValue,
+    nextState: state
+  };
 };
 
 function validateArrayElement(state, node) {

@@ -1,7 +1,5 @@
 'use strict'
 
-const parseExpression = require('../parse-expression');
-
 // basically an array literal
 exports.validate = function validateArrayExpression(state, node) {
   // preconditions: the lhs is a valid, declared, non-const LValue, everything from the rhs
@@ -11,15 +9,83 @@ exports.validate = function validateArrayExpression(state, node) {
 
   const operator = node.operator;
 
-  const left = parseLValue(node.left);
-  const right = parseRValue(node.right);
+  // the operator itself doesnt impose any preconditions on the right
+  // right hand side is always executed before left
+  const rightResult = validateRValue(state, node.right);
+
+  state = rightResult.state;
+
+  const leftResult = validateLValue(state, node.left);
+
+  state = leftResult.state;
+
+  // make sure if the left is decomp, that the right matches
+  // make sure left is declared
+  // we must know for sure the left exists in the scope
+
+  switch (operator) {
+    case '=': {
+      // set left value to right
+      // return that value as well
+      break;
+    }
+
+    case '+=': {
+      // rhs must evaluate to string or number
+      // lhs must be also be string or number
+      // lhs and rhs must be the same type
+      break;
+    }
+
+    case '*=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '/=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '%=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '-=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '<<=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '>>=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '>>>=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '|=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '&=': {
+      // both lhs and rhs must be number
+      break;
+    }
+    case '^=': {
+      // both lhs and rhs must be number
+      break;
+    }
+  }
+
 
 };
 
-function parseLValue(node) {
-  return parseExpression(node);
+function validateLValue(state, node) {
+  return validateExpression(state, node);
 }
 
-function parseRValue(node) {
-  return parseExpression(node);
+function validateRValue(state, node) {
+  return validateExpression(state, node);
 }
